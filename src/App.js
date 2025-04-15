@@ -42,15 +42,22 @@ export default function BreastCancerDiagnosis() {
   };
 
   const proceedToUpload = () => {
+    const { name, age, contact, weight, height } = patientDetails;
+  
+    if (!name || !age || !contact || !weight || !height) {
+      alert("Please fill in all required fields: Name, Age, Contact, Weight, and Height");
+      return;
+    }
+  
     setStep(3);
   };
-
+  
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
   
     setImage(URL.createObjectURL(file));
-    setSelectedFile(file); // ⬅️ new: store image file for predict
+    setSelectedFile(file);
     setResult(null);
   };
 
@@ -138,23 +145,23 @@ export default function BreastCancerDiagnosis() {
               <p className="text-pink-700 font-semibold text-lg text-center mb-4">Patient Details</p>
               <div className="flex flex-col gap-4">
                 <div>
-                  <Label htmlFor="name" className="text-pink-600">Name</Label>
+                  <Label htmlFor="name" className="text-pink-600">Name *</Label>
                   <Input name="name" value={patientDetails.name} onChange={handlePatientDetailChange} placeholder="Enter your name" />
                 </div>
                 <div>
-                  <Label htmlFor="age" className="text-pink-600">Age</Label>
+                  <Label htmlFor="age" className="text-pink-600">Age *</Label>
                   <Input name="age" type="number" value={patientDetails.age} onChange={handlePatientDetailChange} placeholder="Enter your age" />
                 </div>
                 <div>
-                  <Label htmlFor="contact" className="text-pink-600">Contact</Label>
+                  <Label htmlFor="contact" className="text-pink-600">Contact *</Label>
                   <Input name="contact" value={patientDetails.contact} onChange={handlePatientDetailChange} placeholder="Enter your contact number" />
                 </div>
                 <div>
-                  <Label htmlFor="weight" className="text-pink-600">Weight (kg)</Label>
+                  <Label htmlFor="weight" className="text-pink-600">Weight (kg) *</Label>
                   <Input name="weight" value={patientDetails.weight} onChange={handlePatientDetailChange} placeholder="Enter your weight" />
                 </div>
                 <div>
-                  <Label htmlFor="height" className="text-pink-600">Height (cm)</Label>
+                  <Label htmlFor="height" className="text-pink-600">Height (cm) *</Label>
                   <Input name="height" value={patientDetails.height} onChange={handlePatientDetailChange} placeholder="Enter your height" />
                 </div>
                 <div>
