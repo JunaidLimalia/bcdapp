@@ -27,6 +27,7 @@ export default function BreastCancerDiagnosis() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const handleGenderSelect = (selectedGender) => {
     setGender(selectedGender);
@@ -46,7 +47,10 @@ export default function BreastCancerDiagnosis() {
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
+    if (!file) return;
+  
     setImage(URL.createObjectURL(file));
+    setSelectedFile(file); // ⬅️ new: store image file for predict
     setResult(null);
   };
 
@@ -60,12 +64,28 @@ export default function BreastCancerDiagnosis() {
   };
 
   const handlePredict = () => {
+    if (!selectedFile) return;
+  
     setLoading(true);
-    setTimeout(() => {
-      setResult("Benign"); // Replace this with actual prediction call
-      setLoading(false);
-    }, 2000);
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+  
+    fetch("http://localhost:5000/predict", {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setResult(data.prediction);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Prediction failed:", err);
+        setResult("Error during prediction");
+        setLoading(false);
+      });
   };
+  
   return (
     <div className="min-h-screen bg-pink-50 p-8">
       <motion.h1
