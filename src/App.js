@@ -5,7 +5,6 @@ import { Label } from "./components/ui/label";
 import { Card, CardContent } from "./components/ui/card";
 import { useState } from "react";
 import { motion } from "framer-motion";
-// import { Venus, Mars } from "lucide-react";
 import { UserIcon, UserCircleIcon } from "lucide-react";
 import { useRef } from "react";
 
@@ -28,6 +27,8 @@ export default function BreastCancerDiagnosis() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [gradcam, setGradcam] = useState(null);
+  const [superimposed, setSuperimposed] = useState(null);
 
   const handleGenderSelect = (selectedGender) => {
     setGender(selectedGender);
@@ -64,7 +65,10 @@ export default function BreastCancerDiagnosis() {
   const handleClear = () => {
     setImage(null);
     setResult(null);
+    setGradcam(null);
+    setSuperimposed(null);
     setLoading(false);
+    setStep(1);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -84,7 +88,10 @@ export default function BreastCancerDiagnosis() {
       .then((res) => res.json())
       .then((data) => {
         setResult(data.prediction);
+        setGradcam("http://localhost:5000" + data.gradcam);
+        setSuperimposed("http://localhost:5000" + data.superimposed);
         setLoading(false);
+        // setStep(4);
       })
       .catch((err) => {
         console.error("Prediction failed:", err);
@@ -115,7 +122,6 @@ export default function BreastCancerDiagnosis() {
                   onClick={() => handleGenderSelect("female")}
                 >
                   <div className="flex flex-col items-center gap-2">
-                    {/* <Venus size={48} className="text-pink-600" /> */}
                     <UserIcon size={48} className="text-pink-600" />
                     <span className="text-pink-600 font-medium">Female</span>
                   </div>
@@ -127,7 +133,6 @@ export default function BreastCancerDiagnosis() {
                   onClick={() => handleGenderSelect("male")}
                 >
                   <div className="flex flex-col items-center gap-2">
-                    {/* <Mars size={48} className="text-pink-600" /> */}
                     <UserCircleIcon size={48} className="text-pink-600" />
                     <span className="text-pink-600 font-medium">Male</span>
                   </div>
@@ -224,12 +229,61 @@ export default function BreastCancerDiagnosis() {
                   className="mt-4 text-center text-lg font-bold text-pink-600"
                 >
                   Diagnosis Result: {result}
+
+                  <div className="mt-4">
+                    <Button
+                      onClick={() => setStep(4)}
+                      className="bg-pink-600 hover:bg-pink-700 text-white rounded-lg px-6 py-2 mt-2"
+                    >
+                      View Explanation
+                    </Button>
+                  </div>
                 </motion.div>
               )}
             </CardContent>
           </Card>
         </div>
       )}
+
+      {step === 4 && (
+        <div className="max-w-4xl mx-auto">
+          <Card className="rounded-2xl shadow-md bg-white">
+            <CardContent className="p-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center mb-6"
+              >
+                <p className="text-pink-600 font-semibold text-lg mb-2">Diagnosis Result: {result}</p>
+                <p className="text-pink-600 font-semibold text-md">Grad-CAM Explanation</p>
+              </motion.div>
+
+              <div className="flex justify-center gap-6">
+                <img
+                  src={gradcam}
+                  alt="Grad-CAM Heatmap"
+                  className="rounded-lg border border-pink-200 w-[300px] h-[300px] object-contain"
+                />
+                <img
+                  src={superimposed}
+                  alt="Superimposed"
+                  className="rounded-lg border border-pink-200 w-[300px] h-[300px] object-contain"
+                />
+              </div>
+
+              <div className="flex justify-center mt-6">
+                <Button
+                  onClick={handleClear}
+                  className="bg-pink-600 hover:bg-pink-700 text-white rounded-lg px-6 py-2"
+                >
+                  New Diagnosis
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }
