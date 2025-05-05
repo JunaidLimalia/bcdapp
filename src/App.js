@@ -29,6 +29,7 @@ export default function BreastCancerDiagnosis() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [gradcam, setGradcam] = useState(null);
   const [superimposed, setSuperimposed] = useState(null);
+  const [textExplanation, setTextExplanation] = useState("");
 
   const handleGenderSelect = (selectedGender) => {
     setGender(selectedGender);
@@ -68,6 +69,29 @@ export default function BreastCancerDiagnosis() {
     setGradcam(null);
     setSuperimposed(null);
     setLoading(false);
+    // setStep(1);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleNewDiagnosis = () => {
+    setImage(null);
+    setResult(null);
+    setGradcam(null);
+    setSuperimposed(null);
+    setLoading(false);
+    setGender(null);
+    setPatientDetails({
+      name: "",
+      age: "",
+      contact: "",
+      weight: "",
+      height: "",
+      familyHistory: "",
+      symptoms: "",
+      medicalConditions: ""
+    });
     setStep(1);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -88,8 +112,10 @@ export default function BreastCancerDiagnosis() {
       .then((res) => res.json())
       .then((data) => {
         setResult(data.prediction);
-        setGradcam("http://localhost:5000" + data.gradcam);
-        setSuperimposed("http://localhost:5000" + data.superimposed);
+        const timestamp = new Date().getTime();
+        setGradcam("http://localhost:5000" + data.gradcam + `?t=${timestamp}`);
+        setSuperimposed("http://localhost:5000" + data.superimposed + `?t=${timestamp}`);
+        setTextExplanation(data.textExplanation);
         setLoading(false);
         // setStep(4);
       })
@@ -255,25 +281,26 @@ export default function BreastCancerDiagnosis() {
                 className="text-center mb-6"
               >
                 <p className="text-pink-600 font-semibold text-lg mb-2">Diagnosis Result: {result}</p>
-                <p className="text-pink-600 font-semibold text-md">Grad-CAM Explanation</p>
+                <p className="text-pink-600 font-semibold text-md whitespace-pre-line">{textExplanation}</p>
+                <p className="text-pink-600 font-semibold text-md mt-6">Grad-CAM Explanation</p>
               </motion.div>
 
-              <div className="flex justify-center gap-6">
-                <img
-                  src={gradcam}
-                  alt="Grad-CAM Heatmap"
-                  className="rounded-lg border border-pink-200 w-[300px] h-[300px] object-contain"
-                />
-                <img
-                  src={superimposed}
-                  alt="Superimposed"
-                  className="rounded-lg border border-pink-200 w-[300px] h-[300px] object-contain"
-                />
-              </div>
+              <div className="flex justify-center gap-6 flex-wrap">
+              <img
+                src={gradcam}
+                alt="Grad-CAM Heatmap"
+                className="rounded-xl border border-pink-300 w-[350px] h-[350px] object-cover"
+              />
+              <img
+                src={superimposed}
+                alt="Superimposed"
+                className="rounded-xl border border-pink-300 w-[350px] h-[350px] object-cover"
+              />
+            </div>
 
               <div className="flex justify-center mt-6">
                 <Button
-                  onClick={handleClear}
+                  onClick={handleNewDiagnosis}
                   className="bg-pink-600 hover:bg-pink-700 text-white rounded-lg px-6 py-2"
                 >
                   New Diagnosis
