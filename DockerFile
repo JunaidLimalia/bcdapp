@@ -15,10 +15,12 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+# RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# COPY model.pth /app/model.pth
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --prefer-binary --retries 10 --timeout 60 -r requirements.txt
 
+# COPY model.pth
 RUN apt-get update && apt-get install -y git git-lfs \
     && git lfs install \
     && git clone https://github.com/JunaidLimalia/bcdapp.git /app \
