@@ -1,0 +1,26 @@
+# Node modules and build artifacts
+frontend/node_modules
+frontend/build
+
+# Python cache and logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Git-related files
+.git
+.gitignore
+.gitattributes
+
+# LFS metadata
+*.gitattributes
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments (if any)
+venv/
+.env
