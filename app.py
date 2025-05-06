@@ -17,6 +17,8 @@ import cv2
 app = Flask(__name__)
 CORS(app)
 
+app.config['DEBUG'] = os.environ.get('FLASK_DEBUG')
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Ensure static directory exists
@@ -45,8 +47,8 @@ def create_model():
     return model
 
 model = create_model()
-checkpoint = torch.load("model.pth", map_location=device)
-model.load_state_dict(checkpoint["model_state_dict"])
+# checkpoint = torch.load("model.pth", map_location=device)
+# model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()
 
@@ -150,7 +152,5 @@ def predict():
 #         return send_from_directory(app.static_folder, "index.html")
 
 if __name__ == "__main__":
-    # app.run(debug=True)
-    # port = int(os.environ.get("PORT", 8080))
-    # app.run(host="0.0.0.0", port=port, debug=True)
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    app.run(debug=True)
+    # app.run(debug=True, host="0.0.0.0", port=8080)
