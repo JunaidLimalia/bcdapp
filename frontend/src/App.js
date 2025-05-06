@@ -105,7 +105,8 @@ export default function BreastCancerDiagnosis() {
     const formData = new FormData();
     formData.append("image", selectedFile);
   
-    fetch("http://localhost:5000/predict", {
+    // fetch("http://localhost:5000/predict", {
+    fetch("https://breastcancerdiagnosisapp-278830470653.asia-southeast1.run.app/predict", {
       method: "POST",
       body: formData,
     })
@@ -113,8 +114,10 @@ export default function BreastCancerDiagnosis() {
       .then((data) => {
         setResult(data.prediction);
         const timestamp = new Date().getTime();
-        setGradcam("http://localhost:5000" + data.gradcam + `?t=${timestamp}`);
-        setSuperimposed("http://localhost:5000" + data.superimposed + `?t=${timestamp}`);
+        // setGradcam("http://localhost:5000" + data.gradcam + `?t=${timestamp}`);
+        // setSuperimposed("http://localhost:5000" + data.superimposed + `?t=${timestamp}`);
+        setGradcam("https://breastcancerdiagnosisapp-278830470653.asia-southeast1.run.app" + data.gradcam + `?t=${timestamp}`);
+        setSuperimposed("https://breastcancerdiagnosisapp-278830470653.asia-southeast1.run.app" + data.superimposed + `?t=${timestamp}`);
         setTextExplanation(data.textExplanation);
         setLoading(false);
         // setStep(4);
