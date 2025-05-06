@@ -23,10 +23,10 @@ COPY model.pth .
 COPY . .
 
 # Optional: set environment variable if needed by app.py
-ENV PORT=5000
+ENV PORT=8080
 
 # Expose port
-EXPOSE 5000
+EXPOSE 8080
 
 # Start Flask app
 CMD ["python", "app.py"]
