@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import torch
 import torch.nn as nn
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
 CORS(app)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,6 +138,15 @@ def predict():
         "superimposed": "/static/superimposed.jpg",
         "textExplanation": text_explanation
     })
+
+# Serve React app
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, "index.html")
 
 if __name__ == "__main__":
     # app.run(debug=True)
