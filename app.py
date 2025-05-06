@@ -12,6 +12,16 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import gdown
+
+MODEL_PATH = "model.pth"
+GDRIVE_FILE_ID = "17X8kTKsaetr_sotMhKRrYVNrSVHEjRis"
+GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
+
+# Download model if not already present
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model from Google Drive...")
+    gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
 
 app = Flask(__name__)
 CORS(app)
@@ -44,7 +54,8 @@ def create_model():
     return model
 
 model = create_model()
-checkpoint = torch.load("model.pth", map_location=device)
+# checkpoint = torch.load("model.pth", map_location=device)
+checkpoint = torch.load(MODEL_PATH, map_location=device)
 model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()
