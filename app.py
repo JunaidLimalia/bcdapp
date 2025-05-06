@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-# app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
-app = Flask(__name__)
-CORS(app)
+app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
+# app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG')
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 # Ensure static directory exists
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -47,8 +48,8 @@ def create_model():
     return model
 
 model = create_model()
-# checkpoint = torch.load("model.pth", map_location=device)
-# model.load_state_dict(checkpoint["model_state_dict"])
+checkpoint = torch.load("model.pth", map_location=device)
+model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()
 
@@ -107,50 +108,75 @@ def visualize_gradcam(image_pil, image_tensor, model, target_class):
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if "image" not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
+    try:
+        if "image" not in request.files:
+            return jsonify({"error": "No image uploaded"}), 400
 
-    file = request.files["image"]
-    img = Image.open(io.BytesIO(file.read())).convert("RGB")
-    img_tensor = transform(img).unsqueeze(0).to(device)
+        file = request.files["image"]
+        img = Image.open(io.BytesIO(file.read())).convert("RGB")
+        img_tensor = transform(img).unsqueeze(0).to(device)
 
-    with torch.no_grad():
-        outputs = model(img_tensor)
-        _, predicted = torch.max(outputs, 1)
+        with torch.no_grad():
+            outputs = model(img_tensor)
+            _, predicted = torch.max(outputs, 1)
 
-    visualize_gradcam(img, img_tensor, model, predicted.item())
+        visualize_gradcam(img, img_tensor, model, predicted.item())
 
-    # Probability calculation
-    probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
-    benign_prob = float(probabilities[0]) * 100
-    malignant_prob = float(probabilities[1]) * 100
-    confidence = max(benign_prob, malignant_prob)
-    predicted_class = "Benign" if predicted.item() == 0 else "Malignant"
+        # Probability calculation
+        probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
+        benign_prob = float(probabilities[0]) * 100
+        malignant_prob = float(probabilities[1]) * 100
+        confidence = max(benign_prob, malignant_prob)
+        predicted_class = "Benign" if predicted.item() == 0 else "Malignant"
 
-    # Summary explanation
-    text_explanation = (
-        f"The model predicts this case as {predicted_class} with a confidence of {confidence:.2f}%. "
-        f"It estimates a {benign_prob:.2f}% likelihood that the sample is benign and {malignant_prob:.2f}% "
-        f"for malignant. These probabilities reflect the model's level of certainty after analyzing the "
-        f"tissue patterns, structure, and intensity distribution in the input image."
-    )
+        # Summary explanation
+        text_explanation = (
+            f"The model predicts this case as {predicted_class} with a confidence of {confidence:.2f}%. "
+            f"It estimates a {benign_prob:.2f}% likelihood that the sample is benign and {malignant_prob:.2f}% "
+            f"for malignant. These probabilities reflect the model's level of certainty after analyzing the "
+            f"tissue patterns, structure, and intensity distribution in the input image."
+        )
 
-    return jsonify({
-        "prediction": predicted_class,
-        "gradcam": "/static/gradcam.png",
-        "superimposed": "/static/superimposed.jpg",
-        "textExplanation": text_explanation
+        return jsonify({
+            "prediction": predicted_class,
+            "gradcam": "/static/gradcam.png",
+            "superimposed": "/static/superimposed.jpg",
+            "textExplanation": text_explanation
     })
 
-# # Serve React app
-# @app.route("/", defaults={"path": ""})
-# @app.route("/<path:path>")
-# def serve_react(path):
-#     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-#         return send_from_directory(app.static_folder, path)
-#     else:
-#         return send_from_directory(app.static_folder, "index.html")
+    except Exception as e:
+        print(f"[ERROR] Prediction failed: {e}")
+        return jsonify({"error": "Prediction failed", "details": str(e)}), 500
+
+# Serve React app
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/", methods=["GET"])
+def root():
+    return "App is running", 200
 
 if __name__ == "__main__":
-    app.run(debug=True)
-    # app.run(debug=True, host="0.0.0.0", port=8080)
+    # app.run(debug=True)
+    app.run(host="0.0.0.0", port=8080)
+
+
+
+# Uncomment the following lines if you want to run a simple Flask app without React
+# from flask import Flask
+
+# app = Flask(__name__)
+
+# @app.route("/")
+# def hello():
+#     return "Hello from Flask!"
+
+# if __name__ == "__main__":
+#     import os
+#     port = int(os.environ.get("PORT", 8080))
+#     app.run(host="0.0.0.0", port=port)
