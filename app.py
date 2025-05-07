@@ -12,6 +12,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import base64
 
 app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
 # app = Flask(__name__)
@@ -88,28 +89,31 @@ class GradCAM:
 
         return cam.squeeze().cpu().numpy()
 
-def visualize_gradcam(image_pil, image_tensor, model, target_class):
+def generate_base64_gradcam(image_pil, image_tensor, model, target_class):
     orig_image = np.array(image_pil)
-
     grad_cam = GradCAM(model, model.layer4[-1])
     cam = grad_cam.generate_cam(image_tensor, target_class)
 
-    # Save Grad-CAM heatmap
+    # Heatmap
     heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
     heatmap = cv2.resize(heatmap, (orig_image.shape[1], orig_image.shape[0]))
-    gradcam_path = os.path.join(STATIC_DIR, "gradcam.png")
-    cv2.imwrite(gradcam_path, cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR))
 
-    # Save superimposed image
+    # Superimposed
     superimposed = cv2.addWeighted(orig_image, 0.6, heatmap, 0.4, 0)
-    superimposed_path = os.path.join(STATIC_DIR, "superimposed.jpg")
-    cv2.imwrite(superimposed_path, cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
+
+    # Encode both to base64
+    _, heatmap_buf = cv2.imencode('.png', cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR))
+    _, super_buf = cv2.imencode('.jpg', cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
+
+    heatmap_b64 = base64.b64encode(heatmap_buf).decode('utf-8')
+    super_b64 = base64.b64encode(super_buf).decode('utf-8')
+
+    return heatmap_b64, super_b64
 
 @app.route("/predict", methods=["POST", "OPTIONS"])
 def predict():
     if request.method == "OPTIONS":
-        # Preflight request
         response = jsonify({"message": "CORS preflight"})
         response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
@@ -128,7 +132,7 @@ def predict():
             outputs = model(img_tensor)
             _, predicted = torch.max(outputs, 1)
 
-        visualize_gradcam(img, img_tensor, model, predicted.item())
+        gradcam_b64, superimposed_b64 = generate_base64_gradcam(img, img_tensor, model, predicted.item())
 
         probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
         benign_prob = float(probabilities[0]) * 100
@@ -145,8 +149,8 @@ def predict():
 
         response = jsonify({
             "prediction": predicted_class,
-            "gradcam": "/static/gradcam.png",
-            "superimposed": "/static/superimposed.jpg",
+            "gradcam": f"data:image/png;base64,{gradcam_b64}",
+            "superimposed": f"data:image/jpeg;base64,{superimposed_b64}",
             "textExplanation": text_explanation
         })
         response.headers.add("Access-Control-Allow-Origin", "*")
@@ -170,7 +174,6 @@ def root():
     return "App is running", 200
 
 if __name__ == "__main__":
-    # app.run(debug=True)
     app.run(host="0.0.0.0", port=8080)
 
 
