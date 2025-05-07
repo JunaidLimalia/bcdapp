@@ -106,8 +106,16 @@ def visualize_gradcam(image_pil, image_tensor, model, target_class):
     superimposed_path = os.path.join(STATIC_DIR, "superimposed.jpg")
     cv2.imwrite(superimposed_path, cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
 
-@app.route("/predict", methods=["POST"])
+@app.route("/predict", methods=["POST", "OPTIONS"])
 def predict():
+    if request.method == "OPTIONS":
+        # Preflight request
+        response = jsonify({"message": "CORS preflight"})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        return response, 200
+
     try:
         if "image" not in request.files:
             return jsonify({"error": "No image uploaded"}), 400
@@ -122,14 +130,12 @@ def predict():
 
         visualize_gradcam(img, img_tensor, model, predicted.item())
 
-        # Probability calculation
         probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
         benign_prob = float(probabilities[0]) * 100
         malignant_prob = float(probabilities[1]) * 100
         confidence = max(benign_prob, malignant_prob)
         predicted_class = "Benign" if predicted.item() == 0 else "Malignant"
 
-        # Summary explanation
         text_explanation = (
             f"The model predicts this case as {predicted_class} with a confidence of {confidence:.2f}%. "
             f"It estimates a {benign_prob:.2f}% likelihood that the sample is benign and {malignant_prob:.2f}% "
@@ -137,12 +143,14 @@ def predict():
             f"tissue patterns, structure, and intensity distribution in the input image."
         )
 
-        return jsonify({
+        response = jsonify({
             "prediction": predicted_class,
             "gradcam": "/static/gradcam.png",
             "superimposed": "/static/superimposed.jpg",
             "textExplanation": text_explanation
-    })
+        })
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response
 
     except Exception as e:
         print(f"[ERROR] Prediction failed: {e}")
