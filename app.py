@@ -7,9 +7,9 @@ from torchvision import models, transforms
 from PIL import Image
 import io
 import os
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import base64
@@ -18,14 +18,13 @@ app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
 # app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.config['DEBUG'] = os.environ.get('FLASK_DEBUG')
+# app.config['DEBUG'] = os.environ.get('FLASK_DEBUG')
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
 
-# Ensure static directory exists
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-os.makedirs(STATIC_DIR, exist_ok=True)
+# STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+# os.makedirs(STATIC_DIR, exist_ok=True)
 
 # Define image transforms
 transform = transforms.Compose([
@@ -88,6 +87,81 @@ class GradCAM:
         cam = cam / (cam.max() + 1e-8)
 
         return cam.squeeze().cpu().numpy()
+    
+class AblationCAM:
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.target_layer = target_layer
+        self.device = next(model.parameters()).device
+
+        self.model.eval()
+        self.features = None
+
+        # Capture output of target layer
+        def forward_hook(module, input, output):
+            self.features = output.detach()
+
+        self.target_layer.register_forward_hook(forward_hook)
+
+    def forward_to_layer(self, x):
+        """Manual forward pass up to the target layer (layer4[-1])"""
+        x = self.model.conv1(x)
+        x = self.model.bn1(x)
+        x = self.model.relu(x)
+        x = self.model.maxpool(x)
+
+        x = self.model.layer1(x)
+        x = self.model.layer2(x)
+        x = self.model.layer3(x)
+        x = self.model.layer4(x)  # self.features will be captured here
+        return x
+
+    def forward_from_layer(self, features):
+        """Continue forward pass from after target layer"""
+        x = self.model.avgpool(features)
+        x = torch.flatten(x, 1)
+        x = self.model.fc(x)
+        return x
+
+    def generate_cam(self, input_image, target_class=None):
+        self.features = None  # Clear previous features
+        self.model.eval()
+
+        with torch.no_grad():
+            _ = self.forward_to_layer(input_image)
+
+        feature_maps = self.features[0]  # [C, H, W]
+        n_channels = feature_maps.shape[0]
+
+        with torch.no_grad():
+            original_output = self.forward_from_layer(self.features)
+        if target_class is None:
+            target_class = original_output.argmax(dim=1)
+
+        original_score = original_output[0][target_class].item()
+        importance_scores = torch.zeros(n_channels, device=self.device)
+
+        for i in range(n_channels):
+            ablated = self.features.clone()
+            ablated[0, i] = 0  # Zero out one channel
+            with torch.no_grad():
+                ablated_output = self.forward_from_layer(ablated)
+            ablated_score = ablated_output[0][target_class].item()
+            importance_scores[i] = original_score - ablated_score
+
+        cam = torch.zeros(feature_maps.shape[1:], device=self.device)
+        for i in range(n_channels):
+            cam += importance_scores[i] * feature_maps[i]
+
+        cam = F.relu(cam)
+        cam = F.interpolate(cam.unsqueeze(0).unsqueeze(0),
+                            input_image.shape[2:],
+                            mode='bilinear',
+                            align_corners=False)
+        cam = cam - cam.min()
+        cam = cam / (cam.max() + 1e-8)
+
+        return cam.squeeze().cpu().numpy()
 
 def generate_base64_gradcam(image_pil, image_tensor, model, target_class):
     orig_image = np.array(image_pil)
@@ -103,6 +177,25 @@ def generate_base64_gradcam(image_pil, image_tensor, model, target_class):
     superimposed = cv2.addWeighted(orig_image, 0.6, heatmap, 0.4, 0)
 
     # Encode both to base64
+    _, heatmap_buf = cv2.imencode('.png', cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR))
+    _, super_buf = cv2.imencode('.jpg', cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
+
+    heatmap_b64 = base64.b64encode(heatmap_buf).decode('utf-8')
+    super_b64 = base64.b64encode(super_buf).decode('utf-8')
+
+    return heatmap_b64, super_b64
+
+def generate_base64_ablationcam(image_pil, image_tensor, model, target_class):
+    orig_image = np.array(image_pil)
+    ablation_cam = AblationCAM(model, model.layer4[-1])
+    cam = ablation_cam.generate_cam(image_tensor, target_class)
+
+    heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    heatmap = cv2.resize(heatmap, (orig_image.shape[1], orig_image.shape[0]))
+
+    superimposed = cv2.addWeighted(orig_image, 0.6, heatmap, 0.4, 0)
+
     _, heatmap_buf = cv2.imencode('.png', cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR))
     _, super_buf = cv2.imencode('.jpg', cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
 
@@ -133,6 +226,7 @@ def predict():
             _, predicted = torch.max(outputs, 1)
 
         gradcam_b64, superimposed_b64 = generate_base64_gradcam(img, img_tensor, model, predicted.item())
+        ablationcam_b64, ablation_superimposed_b64 = generate_base64_ablationcam(img, img_tensor, model, predicted.item())
 
         probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
         benign_prob = float(probabilities[0]) * 100
@@ -151,6 +245,8 @@ def predict():
             "prediction": predicted_class,
             "gradcam": f"data:image/png;base64,{gradcam_b64}",
             "superimposed": f"data:image/jpeg;base64,{superimposed_b64}",
+            "ablationcam": f"data:image/png;base64,{ablationcam_b64}",
+            "ablationSuperimposed": f"data:image/jpeg;base64,{ablation_superimposed_b64}",
             "textExplanation": text_explanation
         })
         response.headers.add("Access-Control-Allow-Origin", "*")
@@ -188,6 +284,4 @@ if __name__ == "__main__":
 #     return "Hello from Flask!"
 
 # if __name__ == "__main__":
-#     import os
-#     port = int(os.environ.get("PORT", 8080))
-#     app.run(host="0.0.0.0", port=port)
+#     app.run(host="0.0.0.0", port=8080)

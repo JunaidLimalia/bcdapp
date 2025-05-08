@@ -30,10 +30,12 @@ export default function BreastCancerDiagnosis() {
   const [gradcam, setGradcam] = useState(null);
   const [superimposed, setSuperimposed] = useState(null);
   const [textExplanation, setTextExplanation] = useState("");
+  const [ablationcam, setAblationcam] = useState(null);
+  const [ablationSuperimposed, setAblationSuperimposed] = useState(null);
 
   const handleGenderSelect = (selectedGender) => {
     setGender(selectedGender);
-    setStep(2);
+    setStep(3); // Proceed to upload step, no patient details needed
   };
 
   const handlePatientDetailChange = (e) => {
@@ -68,6 +70,8 @@ export default function BreastCancerDiagnosis() {
     setResult(null);
     setGradcam(null);
     setSuperimposed(null);
+    setAblationcam(null);
+    setAblationSuperimposed(null);
     setLoading(false);
     // setStep(1);
     if (fileInputRef.current) {
@@ -80,6 +84,8 @@ export default function BreastCancerDiagnosis() {
     setResult(null);
     setGradcam(null);
     setSuperimposed(null);
+    setAblationcam(null);
+    setAblationSuperimposed(null);
     setLoading(false);
     setGender(null);
     setPatientDetails({
@@ -104,7 +110,8 @@ export default function BreastCancerDiagnosis() {
     setLoading(true);
     const formData = new FormData();
     formData.append("image", selectedFile);
-  
+    
+    // fetch("http://127.0.0.1:8080/predict", { // to run locally, uncomment this line, comment the next line
     fetch("https://bcdapp-358860318763.asia-southeast1.run.app/predict", {
       method: "POST",
       body: formData,
@@ -112,12 +119,12 @@ export default function BreastCancerDiagnosis() {
       .then((res) => res.json())
       .then((data) => {
         setResult(data.prediction);
-        const timestamp = new Date().getTime();
         setGradcam(data.gradcam);
         setSuperimposed(data.superimposed);
+        setAblationcam(data.ablationcam);
+        setAblationSuperimposed(data.ablationSuperimposed);
         setTextExplanation(data.textExplanation);
         setLoading(false);
-        // setStep(4);
       })
       .catch((err) => {
         console.error("Prediction failed:", err);
@@ -297,6 +304,33 @@ export default function BreastCancerDiagnosis() {
                 className="rounded-xl border border-pink-300 w-[350px] h-[350px] object-cover"
               />
             </div>
+
+            {ablationcam && ablationSuperimposed && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center mt-10 mb-6"
+                >
+                  <p className="text-pink-600 font-semibold text-md">
+                    Ablation-CAM Explanation
+                  </p>
+                </motion.div>
+
+                <div className="flex justify-center gap-6 flex-wrap">
+                  <img
+                    src={ablationcam}
+                    alt="Ablation-CAM Heatmap"
+                    className="rounded-xl border border-pink-300 w-[350px] h-[350px] object-cover"
+                  />
+                  <img
+                    src={ablationSuperimposed}
+                    alt="Ablation-CAM Superimposed"
+                    className="rounded-xl border border-pink-300 w-[350px] h-[350px] object-cover"
+                  />
+                </div>
+              </>
+            )}
 
               <div className="flex justify-center mt-6">
                 <Button
