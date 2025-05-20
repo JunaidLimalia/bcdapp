@@ -18,13 +18,8 @@ app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
 # app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# app.config['DEBUG'] = os.environ.get('FLASK_DEBUG')
-
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
-
-# STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-# os.makedirs(STATIC_DIR, exist_ok=True)
 
 # Define image transforms
 transform = transforms.Compose([
@@ -43,12 +38,12 @@ def create_model():
         nn.Linear(num_features, 512),
         nn.ReLU(),
         nn.Dropout(p=0.3),
-        nn.Linear(512, 2)
+        nn.Linear(512, 3)
     )
     return model
 
 model = create_model()
-checkpoint = torch.load("model.pth", map_location=device)
+checkpoint = torch.load("best_model_checkpoint.pth", map_location=device)
 model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()
@@ -231,14 +226,14 @@ def predict():
         probabilities = torch.softmax(outputs, dim=1)[0].cpu().numpy()
         benign_prob = float(probabilities[0]) * 100
         malignant_prob = float(probabilities[1]) * 100
-        confidence = max(benign_prob, malignant_prob)
-        predicted_class = "Benign" if predicted.item() == 0 else "Malignant"
+        irrelevant_prob = float(probabilities[2]) * 100
+        confidence = max(benign_prob, malignant_prob, irrelevant_prob)
+        predicted_class = ("Benign" if predicted.item() == 0 else "Malignant" if predicted.item() == 1 else "Irrelevant")
 
         text_explanation = (
-            f"The model predicts this case as {predicted_class} with a confidence of {confidence:.2f}%. "
-            f"It estimates a {benign_prob:.2f}% likelihood that the sample is benign and {malignant_prob:.2f}% "
-            f"for malignant. These probabilities reflect the model's level of certainty after analyzing the "
-            f"tissue patterns, structure, and intensity distribution in the input image."
+            f"The model predicts this case as {predicted_class} with {confidence:.2f}% confidence. "
+            f"Estimated probabilities: {benign_prob:.2f}% benign, {malignant_prob:.2f}% malignant, {irrelevant_prob:.2f}% irrelevant. "
+            f"These reflect the model's analysis of tissue patterns and structures in the image."
         )
 
         response = jsonify({
@@ -271,17 +266,3 @@ def root():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
-
-
-# Uncomment the following lines if you want to run a simple Flask app without React
-# from flask import Flask
-
-# app = Flask(__name__)
-
-# @app.route("/")
-# def hello():
-#     return "Hello from Flask!"
-
-# if __name__ == "__main__":
-#     app.run(host="0.0.0.0", port=8080)
