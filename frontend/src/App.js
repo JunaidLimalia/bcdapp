@@ -65,7 +65,7 @@ export default function BreastCancerDiagnosis() {
     const formData = new FormData();
     formData.append("image", selectedFile);
     
-    // fetch("http://127.0.0.1:8080/predict", { // to run locally, uncomment this line, comment the next line
+    // fetch("http://127.0.0.1:8080/predict", { // to run locally, uncomment this line, comment the next line, run nmp build again
     fetch("https://bcdapp-358860318763.asia-southeast1.run.app/predict", {
       method: "POST",
       body: formData,

@@ -7,19 +7,14 @@ from torchvision import models, transforms
 from PIL import Image
 import io
 import os
-# import matplotlib
-# matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import base64
 
 app = Flask(__name__, static_folder="frontend/build", static_url_path="/")
-# app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define image transforms
 transform = transforms.Compose([
